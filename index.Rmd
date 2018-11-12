@@ -1,0 +1,171 @@
+---
+title: "Divorces by Cause in Poland, 1999-2017"
+author: "Katarzyna Bojarska"
+date: "2018 11 12"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE, warning=F,message=F}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## The dataset  
+
+The divorce data was acquired on November 11, 2018 from the official website of the Polish [Central Statistical Office](https://bdl.stat.gov.pl/BDL/dane/podgrup/tablica#).  
+
+The dataset lists the number of divorces by cause for each year between 1999 and 2017.
+
+Two statistics are provided for each cause:
+
+- one for the number of divorces where the cause is exclusive,  
+- and one for the number of divorces, where the cause is non-exclusive (i.e. is listed among others causes).
+
+## Cleaning data  
+
+The original dataset needed several transformations before it was eligible for plotting.  
+
+Following libraries were used.  
+
+```{r libraries, echo = TRUE, message=FALSE}
+#load libraries
+library(stringr)
+library(reshape)
+library(data.table)
+library(plotly)
+library(dplyr)
+```
+
+```{r clean, echo=FALSE}
+#load dataset
+dane <- read.csv("LUDN_1349_CTAB_20181111233508.csv",sep = ";")
+#translate column names
+nazwy <- names(dane)
+nazwy <- str_replace(nazwy,"niedochowanie.wiernoÅ.ci.maÅ.Å.eÅ.skiej","marital.infidelity")
+nazwy <- str_replace(nazwy,"wyÅ.Ä.cznie","exclusively")
+nazwy <- str_replace(nazwy,"Å.Ä.cznie.z.innymi.przyczynami","among.others")
+nazwy <- str_replace(nazwy,"naduÅ.ywanie.alkoholu","alcohol.abuse")
+nazwy <- str_replace(nazwy,"naganny.stosunek.do.czÅ.onkÃ³w.rodziny","bad.attitude.toward.family.members")
+nazwy <- str_replace(nazwy,"trudnoÅ.ci.mieszkaniowe","housing.difficulties")
+nazwy <- str_replace(nazwy,"nieporozumienia.na.tle.finansowym","financial.disagreements")
+nazwy <- str_replace(nazwy,"niezgodnoÅ.Ä..charakterÃ³w","incoherence.of.characters")
+nazwy <- str_replace(nazwy,"niedobÃ³r.seksualny","sexual.discordance")
+nazwy <- str_replace(nazwy,"dÅ.uÅ.sza.nieobecnoÅ.Ä.","prolonged.absence")
+nazwy <- str_replace(nazwy,"rÃ³Å.nice.Å.wiatopoglÄ.dowe","discordant.beliefs")
+nazwy <- str_replace(nazwy,"narkotyki","drug.abuse")
+nazwy <- str_replace(nazwy,"hazard","gambling")
+nazwy <- str_replace(nazwy,"inne","other")
+nazwy <- str_replace(nazwy,"\\.\\.\\.\\.","")
+#replace column names
+names(dane) <- nazwy
+#subset the data (nationwide)
+dane <- dane[1,c(-1,-2,-459)]
+#transpose the data
+data <- t(dane)
+#transform into data frame
+data <- as.data.frame(data)
+#add a column name
+colnames(data)[1] <- "number"
+#create columns for transformations
+data$year <- rownames(data)
+data$cause <- rownames(data)
+#clear the row names
+rownames(data) <- c()
+#extract the year from string
+yearnames <- strsplit(data$year,"\\.")
+#create a year variable
+data$year <- as.numeric(rapply(yearnames,function(x) x[length(x)]))
+#extract the divorce cause from string
+data$cause <- str_replace(data$cause,paste0("\\.",as.character(data$year)),"")
+data$cause <- gsub("\\."," ",data$cause)
+#create a cause variable
+data$cause <- as.factor(data$cause)
+#create a variable containing extracted type of statistic
+data$stat_type <- as.factor(ifelse(grepl("exclusively",data$cause),"exclusively","among_others"))
+#transform the cause variable
+data$cause <- str_replace(data$cause," exclusively","")
+data$cause <- str_replace(data$cause," among others","")
+```
+
+```{r dataset,echo=FALSE}
+#transform the data frame to isolate the "exclusive causes" from "among other causes"
+mdata <- dcast(data, cause + year ~ stat_type, value.var = "number")
+#change class of columns
+mdata$year <- as.integer(mdata$year)
+mdata$cause <- as.factor(mdata$cause)
+```
+
+## Final dataset  
+
+Below is the preview of a sample of the clean version of the dataset, eligible for plotting.  
+
+```{r view_dataset, echo=TRUE}
+sample_n(mdata,10)
+```
+
+## Interpretability of the type of causes  
+
+The interpretability of exclusive and non-exclusive causes is compromised by the lack of apparent consistency.  
+
+It is not clear how to interpret the non-exclusive causes. No information is available on whether the non-exclusive causes refer to all divorce instances where a particular cause was at play, regardless of whether exclusive or not, or if they only include instances where the cause was non-exclusive.  
+
+For some years all types of exclusive and non-exclusive causes sum up to a total number of yearly divorces equal to the actual number indicated elswere on the website.  
+
+For other years respective sums exceed the yearly number of divorces, suggesting that the methodologies for creating indices might have differed on different years.  
+
+## Compromised interpretability  
+
+Therefore we will treat both types of causes independently and won't attempt to demonstrate the causes relative to the total yearly number of divorces, as originally intended.  
+
+We will demonstrate counts rather than percentages instead.  
+
+## The number of divorces by cause (exclusive)  
+
+```{r plotly_ex, echo=TRUE, eval = FALSE, warning=FALSE,message=FALSE}
+x <- list(title = "Year")
+y <- list(title = "Number of divorces by cause")
+plot_ly(mdata,x=~year,y=~exclusively, color = ~cause,
+        linetype = ~cause, type = "scatter", mode = "lines")
+        %>% layout(title='Divorce in Poland by cause (exclusive), 
+                   1999-2017',
+        xaxis = x, yaxis = y)
+```
+
+## Plot: Divorces by cause (exclusive)  
+
+```{r plotly_ex1, echo=FALSE, warning=FALSE,message=FALSE}
+x <- list(title = "Year")
+y <- list(title = "Number of divorces by cause")
+plot_ly(mdata,x=~year,y=~exclusively, color = ~cause, linetype = ~cause, type = "scatter", mode = "lines") %>% layout(title='Divorce in Poland by cause (exclusive), 1999-2017', xaxis = x, yaxis = y)
+```
+
+
+
+## The number of divorces by cause (non-exclusive)  
+
+```{r plotly_nonex, echo=TRUE, eval = FALSE, warning=FALSE,message=FALSE}
+x <- list(title = "Year")
+y <- list(title = "Number of divorces by cause")
+plot_ly(mdata,x=~year,y=~among_others, color = ~cause,
+        linetype = ~cause, type = "scatter", mode = "lines")
+        %>% layout(title='Divorce in Poland by cause (non-exclusive), 
+                   1999-2017',
+        xaxis = x, yaxis = y)
+```
+
+## Plot: Divorces by cause (non-exclusive)  
+
+```{r plotly_nonex1, echo=FALSE, warning=FALSE,message=FALSE}
+x <- list(title = "Year")
+y <- list(title = "Number of divorces by exclusive cause (non-exclusive)")
+plot_ly(mdata,x=~year,y=~among_others, color = ~cause, linetype = ~cause, type = "scatter", mode = "lines") %>% layout(title='Divorce in Poland by cause (non-exclusive), 1999-2017', xaxis = x, yaxis = y)
+```
+
+## Conclusions  
+
+Among the exclusive causes of divorce in Poland, their order appears to be consistent throughout the years, with the incoherence of characters being by far the leading official cause for divorce.  
+
+It is followed by infidelity and alcohol abuse.  
+
+Among the non-exclusive causes of divirce, their order has been changing, with the incoherence of characters being the leading non-exclusive cause in the recend decade.  
+
+Alcohol abuse and infdelity rank on the second and third place in the recent couple of years. Up untill 2009 they were the leading non-exclusive causes, much more common than the now trending incoherence of characters.  
